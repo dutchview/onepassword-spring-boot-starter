@@ -10,9 +10,8 @@ version = '1.0.0'
 sourceCompatibility = '11'
 
 java {
-    toolchain {
-        languageVersion = JavaLanguageVersion.of(17)
-    }
+    sourceCompatibility = JavaVersion.VERSION_1_8
+    targetCompatibility = JavaVersion.VERSION_1_8
 }
 
 def gitHubUsername = project.findProperty("gitHubUserName")
