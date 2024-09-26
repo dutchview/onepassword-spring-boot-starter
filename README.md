@@ -58,6 +58,8 @@ onepassword-spring-boot:
 - **`onepassword-spring-boot.apiToken`**: Your 1Password API token (used to authenticate and retrieve secrets).
 - **`onepassword-spring-boot.vaultNames`**: List of vaults from which you want to retrieve secrets.
 
+**Note**: If you configure properties both in the application.properties or application.yml files, keep in mind that properties in application.yml take precedence. Be sure to avoid conflicts between these configurations to ensure expected behavior.
+
 ### 3. Secret Management
 
 The retrieved secrets are made available as Spring properties and can be accessed just like any other properties using `@Value` or `Environment`.
