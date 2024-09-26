@@ -18,8 +18,8 @@ public class OnePasswordConfigurations {
 
     @Configuration(proxyBeanMethods = false)
     static class OnePasswordPropertySourceConfiguration {
-        @Bean
-        public PropertySourcesPlaceholderConfigurer propertySourcesPlaceholderConfigurer(
+        @Bean(name = "onePasswordPropertySourceConfiguration")
+        public PropertySourcesPlaceholderConfigurer onePasswordPropertySourceConfiguration(
                 ConfigurableEnvironment environment, ApplicationContext applicationContext) {
             String onePasswordUrl = environment.getProperty("onepassword-spring-boot.url");
             String onePasswordApiToken = environment.getProperty("onepassword-spring-boot.apiToken");
