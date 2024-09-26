@@ -6,7 +6,7 @@ plugins {
 }
 
 group = 'com.dutchview'
-version = '1.0.2'
+version = '1.0.0'
 sourceCompatibility = '11'
 
 java {
