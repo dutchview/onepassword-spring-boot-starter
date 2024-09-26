@@ -26,7 +26,6 @@ publishing {
         maven {
             name = "GitHubPackages"
             url = uri("https://maven.pkg.github.com/dutchview/onepassword-spring-boot-starter")
-//            url = uri("https://webhook.site/57feaf96-a090-430d-ac79-ab16de606939")
             credentials {
                 it.username = gitHubUsername
                 it.password = gitHubAccessToken

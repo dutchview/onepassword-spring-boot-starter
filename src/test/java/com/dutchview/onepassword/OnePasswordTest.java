@@ -55,11 +55,11 @@ class OnePasswordTest {
         ItemDetails itemDetails = getOnePasswordService().listItemDetails(vaultUuid, itemId);
 
         Assertions.assertEquals("edcontrols_billing", itemDetails.getTitle());
-        ItemDetails.Field theOne = itemDetails.getFields().stream().filter(field -> field.getLabel().equals("superAdminUser")).findFirst().orElseThrow();
+        ItemDetails.Field theOne = itemDetails.getFields().stream().filter(field -> field.getLabel().equals("superAdminUser")).findFirst().get();
 
         Assertions.assertEquals("data-connectors@edcontrols.com", theOne.getValue());
 
-        theOne = itemDetails.getFields().stream().filter(field -> field.getLabel().equals("superAdminPassword")).findFirst().orElseThrow();
+        theOne = itemDetails.getFields().stream().filter(field -> field.getLabel().equals("superAdminPassword")).findFirst().get();
         Assertions.assertEquals("secret 123", theOne.getValue());
     }
 
