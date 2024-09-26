@@ -1,0 +1,62 @@
+plugins {
+    id 'java'
+    id 'maven-publish'
+    id 'org.springframework.boot' version '2.7.2'
+    id 'io.spring.dependency-management' version '1.1.6'
+}
+
+group = 'com.dutchview'
+version = '1.0.1'
+sourceCompatibility = '11'
+
+java {
+    toolchain {
+        languageVersion = JavaLanguageVersion.of(17)
+    }
+}
+
+def gitHubUsername = project.findProperty("gitHubUserName")
+def gitHubAccessToken = project.findProperty("gitHubAccessToken")
+
+println "gitHubUsername: ${gitHubUsername}"
+println "gitHubAccessToken: ${gitHubAccessToken}"
+
+repositories {
+    mavenCentral()
+}
+
+publishing {
+    repositories {
+        maven {
+            name = "GitHubPackages"
+            url = uri("https://maven.pkg.github.com/dutchview/onepassword-spring-boot-starter")
+//            url = uri("https://webhook.site/57feaf96-a090-430d-ac79-ab16de606939")
+            credentials {
+                it.username = gitHubUsername
+                it.password = gitHubAccessToken
+            }
+        }
+    }
+
+    publications {
+        gpr(MavenPublication) {
+            from(components.java)
+        }
+    }
+
+}
+
+dependencies {
+    implementation 'org.springframework.boot:spring-boot-starter:2.7.2'
+    implementation 'org.springframework.boot:spring-boot-starter-web:2.7.2'
+
+    compileOnly 'org.projectlombok:lombok:1.18.34'
+    annotationProcessor 'org.projectlombok:lombok:1.18.34'
+
+    testImplementation 'org.springframework.boot:spring-boot-starter-test'
+    testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
+}
+
+tasks.named('test') {
+    useJUnitPlatform()
+}

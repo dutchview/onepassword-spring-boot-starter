@@ -1,0 +1,8 @@
+spring.application.name: demo
+
+onepassword-spring-boot:
+  enabled: true
+  url: https://api.edcontrols.com
+  apiToken: XXXXXX
+  vaultNames:
+    - edcontrols-development-secrets
