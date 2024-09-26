@@ -6,7 +6,7 @@ import org.springframework.context.annotation.Import;
 
 @AutoConfiguration
 @ConditionalOnProperty(prefix = "onepassword-spring-boot", name = "enabled", havingValue = "true", matchIfMissing = true)
-@Import({OnePasswordConfigurations.class})
+@Import({OnePasswordConfigurations.OnePasswordPropertySourceConfiguration.class})
 public class OnePasswordAutoConfiguration {
 
 }
