@@ -34,6 +34,7 @@ To use this starter in your Spring Boot project, add the following dependency to
   <groupId>com.github.dutchview</groupId>
   <artifactId>onepassword-spring-boot-starter</artifactId>
   <version>1.0.7</version>
+  <classifier>plain</classifier>
 </dependency>
 ```
 
@@ -46,7 +47,7 @@ repositories {
 }
 
 dependencies {
-    implementation 'com.github.dutchview:onepassword-spring-boot-starter:1.0.7'
+    implementation 'com.github.dutchview:onepassword-spring-boot-starter:1.0.8:plain'
 }
 ```
 
