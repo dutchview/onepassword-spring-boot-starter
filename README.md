@@ -12,7 +12,7 @@ This project is a Spring Boot Starter for automatically retrieving secrets store
 
 ## Prerequisites
 
-- Java 11 or higher
+- Java 8 or higher
 - Spring Boot 2.5 or higher
 - A valid 1Password account and API token
 
@@ -23,16 +23,30 @@ This project is a Spring Boot Starter for automatically retrieving secrets store
 To use this starter in your Spring Boot project, add the following dependency to your `pom.xml`:
 
 ```xml
+<repositories>
+  <repository>
+    <id>jitpack.io</id>
+    <url>https://jitpack.io</url>
+  </repository>
+</repositories>
+
 <dependency>
-    <groupId>com.dutchview</groupId>
-    <artifactId>onepassword-spring-boot-starter</artifactId>
-    <version>1.0.0</version>
+  <groupId>com.github.dutchview</groupId>
+  <artifactId>onepassword-spring-boot-starter</artifactId>
+  <version>1.0.7</version>
 </dependency>
 ```
 
+or for gradle:
+
 ```
+repositories {
+    mavenCentral()
+    maven { url "https://jitpack.io"  }
+}
+
 dependencies {
-    implementation 'com.dutchview:springboot-onepassword:x.x.x'
+    implementation 'com.github.dutchview:onepassword-spring-boot-starter:1.0.7'
 }
 ```
 
@@ -116,6 +130,89 @@ public class MyAppConfig {
 
 3. **Auto-Configuration**: When the application starts, it automatically retrieves the secrets and injects them into the Spring environment, making them available for use in the application context.
 
+
+# Deployment Instructions for `onepassword-spring-boot-starter`
+
+This guide provides steps to deploy a new version of the `onepassword-spring-boot-starter` tool using **GitHub** and **JitPack**, since we were unable to use GitHub Packages to deploy a Maven package that is publicly reachable. We now rely on JitPack for package distribution.
+
+## Prerequisites
+
+- Ensure you have a **GitHub account** with push access to the repository.
+- Make sure your local Git environment is properly set up with the latest version of the tool.
+
+## Steps to Deploy a New Version
+
+### 1. **Push a New Version to GitHub**
+
+1. Make sure your project is up to date with the latest changes.
+
+2. Bump the version in your `build.gradle` (if using Gradle) or `pom.xml` (if using Maven). For example:
+
+  - In `build.gradle`:
+    ```groovy
+    version = '1.0.7' // Update version here
+    ```
+
+3. Commit and push the changes to the main branch (or another branch if using pull requests).
+
+   ```bash
+   git add .
+   git commit -m "Bump version to 1.0.7"
+   git push origin main
+   ```
+
+### 2. **Tag the New Version**
+
+After pushing the changes, tag the new version in Git:
+
+1. Create a new tag with the version number:
+   ```bash
+   git tag 1.0.7
+   ```
+
+2. Push the tag to GitHub:
+   ```bash
+   git push origin 1.0.7
+   ```
+
+### 3. **Create a GitHub Release**
+
+To make the release official and accessible via JitPack, you need to create a **GitHub Release** associated with the new tag:
+
+1. Go to your repository on GitHub (e.g., `https://github.com/dutchview/onepassword-spring-boot-starter`).
+
+2. Click on the **Releases** tab (found near the top of the repository page).
+
+3. Click the **Draft a new release** button.
+
+4. Fill in the following details:
+  - **Tag version**: Select the tag you just pushed (e.g., `1.0.7`).
+  - **Release title**: Name the release (e.g., `1.0.7`).
+  - **Description**: Add any release notes (e.g., new features, bug fixes).
+
+5. Optionally, you can attach binaries (if necessary) by uploading any relevant files.
+
+6. Click **Publish Release**.
+
+### 4. **Verify JitPack Build**
+
+Once the GitHub release is created, JitPack will automatically detect it and attempt to build the project. To verify:
+
+1. Visit the JitPack page for your repository:
+  - Example: `https://jitpack.io/#dutchview/onepassword-spring-boot-starter`
+
+2. Check if the new version appears under "Releases". You should see the new version (e.g., `1.0.7`) and its build status.
+
+3. If there are any build errors, review them and fix any issues in the project configuration. Push fixes and re-tag/release if necessary.
+
+### Reference Links
+
+- [JitPack Documentation](https://jitpack.io/#dutchview/onepassword-spring-boot-starter)
+- [GitHub Release Documentation](https://docs.github.com/en/repositories/releasing-projects-on-github/managing-releases-in-a-repository)
+
+---
+
+By following the steps above, you will successfully deploy a new version of the tool, ensuring that users can access it via JitPack.
 
 ## License
 
