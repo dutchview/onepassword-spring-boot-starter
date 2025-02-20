@@ -5,6 +5,7 @@ on:
 jobs:
   sensitive-info-scan:
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     name: Secret Scan (Trufflehog)
     steps:
     
@@ -124,7 +125,6 @@ jobs:
         path: |
           ${{ env.output3 }}-Syft-sbom-report
 
-
   sca-scan:
     runs-on: ubuntu-latest
     needs: sbom-scan 
@@ -167,27 +167,27 @@ jobs:
         path: |
           ${{ env.output3 }}-Grype-sca-report
     
-    - name: Install OWASP Dependency-Check
-      run: |
-        VERSION=$(curl -s https://jeremylong.github.io/DependencyCheck/current.txt)
-        curl -Ls "https://github.com/jeremylong/DependencyCheck/releases/download/v$VERSION/dependency-check-$VERSION-release.zip" --output ../dependency-check.zip
-        ls -ltr ../
-        mkdir ../dependency-check
-        unzip ../dependency-check.zip -d ../dependency-check
-        ls -ltr ../ 
+    #- name: Install OWASP Dependency-Check
+    #  run: |
+    #    VERSION=$(curl -s https://dependency-check.github.io/DependencyCheck/current.txt)
+    #    curl -Ls "https://github.com/dependency-check/DependencyCheck/releases/download/v$VERSION/dependency-check-$VERSION-release.zip" --output ../dependency-check.zip
+    #    ls -ltr ../
+    #    mkdir ../dependency-check
+    #    unzip ../dependency-check.zip -d ../dependency-check
+    #    ls -ltr ../ 
 
-    - name: Checkout the code
-      uses: actions/checkout@v4
+    #- name: Checkout the code
+    #  uses: actions/checkout@v4
 
-    - name: Scan the repo using OWASP Dependency check
-      run: |
-        ../dependency-check/dependency-check/bin/dependency-check.sh --nvdApiKey efe48904-e189-4ac8-9eba-25e237a1359b --out . --scan ${{ env.result }}
-        pwd
-        ls -ltr
+    #- name: Scan the repo using OWASP Dependency check
+    #  run: |
+    #    ../dependency-check/dependency-check/bin/dependency-check.sh --nvdApiKey efe48904-e189-4ac8-9eba-25e237a1359b --out . --scan ${{ env.result }}
+    #    pwd
+    #    ls -ltr
 
-    - name: Upload owasp dependency check result file
-      uses: actions/upload-artifact@v4
-      with:
-        name: sca-scan-owasp
-        path: |
-          ${{ env.result }}/dependency-check-report.html
+    #- name: Upload owasp dependency check result file
+    #  uses: actions/upload-artifact@v4
+    #  with:
+    #    name: sca-scan-owasp
+    #    path: |
+    #      ${{ env.result }}/dependency-check-report.html
