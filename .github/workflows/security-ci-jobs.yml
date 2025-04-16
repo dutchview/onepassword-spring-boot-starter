@@ -1,0 +1,214 @@
+name: Security CI Jobs
+on: 
+  push:
+    branches: [develop]
+jobs:
+  sensitive-info-scan:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    name: Secret Scan (Trufflehog)
+    steps:
+
+    - name: Checkout the code
+      uses: actions/checkout@v4
+    
+    - name: Install Trufflehog using the script 
+      run: curl -sSfL https://raw.githubusercontent.com/trufflesecurity/trufflehog/main/scripts/install.sh | sh -s -- -b /usr/local/bin
+
+    - name: Current working directory
+      run: |
+        pwd=$(pwd)
+        echo "First output: $pwd"
+        echo "result=$pwd" >> $GITHUB_ENV
+
+    - name: Extract repo name
+      run: |
+        echo "Second output: ${{ env.result }}"
+        output1=${{ env.result }}
+        echo "Third output: $output1"
+        output2=${output1##*/}
+        echo "Fourth output: $output2"
+        echo "output3=$output2" >> $GITHUB_ENV
+
+    - name: Scan the local repo using Trufflehog
+      run: trufflehog git file://${{ env.result }} --json > ${{ env.output3 }}-Trufflehog-report.json
+
+    - name: Upload json result file if present
+      uses: actions/upload-artifact@v4
+      with:
+        name: sensitive-info-scan
+        path: |
+          ${{ env.output3 }}-Trufflehog-report.json
+
+
+  sast-scan:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    name: SAST (DevSkim)
+    steps:
+
+    - name: Checkout the code
+      uses: actions/checkout@v4
+
+    - name: Install dotnet and DevSkim
+      run: |
+        wget https://dot.net/v1/dotnet-install.sh -O dotnet-install.sh
+        chmod +x ./dotnet-install.sh
+        ./dotnet-install.sh
+        pwd=$(pwd)
+        echo "PWD: $pwd"
+        ls -ltr
+        dotnet --version
+        dotnet tool install --global Microsoft.CST.DevSkim.CLI
+        rm -rf ./*
+        ls -ltr
+
+    - name: Current working directory
+      run: |
+        ls -ltr
+        pwd=$(pwd)
+        echo "First output: $pwd"
+        echo "result=$pwd" >> $GITHUB_ENV
+
+    - name: Extract repo name
+      run: |
+        echo "Second output: ${{ env.result }}"
+        output1=${{ env.result }}
+        echo "Third output: $output1"
+        output2=${output1##*/}
+        echo "Fourth output: $output2"
+        echo "output3=$output2" >> $GITHUB_ENV
+
+    - name: Run SAST scan using DevSkim
+      run: |
+        echo "Current directory: ${{ env.result }}"
+        devskim analyze -I ${{ env.result }} -f sarif --output-format json > ${{ env.output3 }}-DevSkim-report.json
+
+    - name: Upload json result file if present
+      uses: actions/upload-artifact@v4
+      with:
+        name: sast-scan
+        path: |
+          ${{ env.output3 }}-DevSkim-report.json
+      
+  sbom-scan:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    name: SBOM (Syft)
+    steps:
+      
+    - name: Checkout the code
+      uses: actions/checkout@v4
+    
+    - name: Install Syft
+      run: |
+        curl -sSfL https://raw.githubusercontent.com/anchore/syft/main/install.sh | sh -s -- -b /usr/local/bin
+
+    - name: Current working directory
+      run: |
+        ls -ltr
+        pwd=$(pwd)
+        echo "First output: $pwd"
+        echo "result=$pwd" >> $GITHUB_ENV
+
+    - name: Extract repo name
+      run: |
+        echo "Second output: ${{ env.result }}"
+        output1=${{ env.result }}
+        echo "Third output: $output1"
+        output2=${output1##*/}
+        echo "Fourth output: $output2"
+        echo "output3=$output2" >> $GITHUB_ENV
+
+    - name: Run SBOM scan on the local repo
+      run: |
+        echo "Current directory: ${{ env.result }}"
+        syft ${{ env.result }} --output cyclonedx-json=${{ env.result }}/${{ env.output3 }}-Syft-sbom-report
+
+    - name: Upload json result file if present
+      uses: actions/upload-artifact@v4
+      with:
+        name: sbom-scan
+        path: |
+          ${{ env.output3 }}-Syft-sbom-report
+
+  sca-scan:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    needs: sbom-scan 
+    name: SCA (Grype and OWASP Dependency Check)
+    steps:
+    
+    - name: Checkout the code
+      uses: actions/checkout@v4
+      
+    - name: Install Grype
+      run: |
+        curl -sSfL https://raw.githubusercontent.com/anchore/grype/main/install.sh | sh -s -- -b /usr/local/bin
+        
+    - name: Current working directory
+      run: |
+        ls -ltr
+        pwd=$(pwd)
+        echo "First output: $pwd"
+        echo "result=$pwd" >> $GITHUB_ENV
+
+    - name: Extract repo name
+      run: |
+        echo "Second output: ${{ env.result }}"
+        output1=${{ env.result }}
+        echo "Third output: $output1"
+        output2=${output1##*/}
+        echo "Fourth output: $output2"
+        echo "output3=$output2" >> $GITHUB_ENV
+
+    - name: Download artifact
+      uses: actions/download-artifact@v4
+      with:
+        name: sbom-scan
+
+    - name: Run SCA scan on the local repo
+      run: |
+        echo "Current directory: ${{ env.result }}"
+        grype ${{ env.result }}/${{ env.output3 }}-Syft-sbom-report > ${{ env.output3 }}-Grype-sca-report
+
+    - name: Upload Grype scan result file if present
+      uses: actions/upload-artifact@v4
+      with:
+        name: sca-scan-grype
+        path: |
+          ${{ env.output3 }}-Grype-sca-report
+    
+    #- name: Install OWASP Dependency-Check
+    #  run: |
+    #    VERSION=$(curl -s https://dependency-check.github.io/DependencyCheck/current.txt)
+    #    curl -Ls "https://github.com/dependency-check/DependencyCheck/releases/download/v$VERSION/dependency-check-$VERSION-release.zip" --output ../dependency-check.zip
+    #    ls -ltr ../
+    #    mkdir ../dependency-check
+    #    unzip ../dependency-check.zip -d ../dependency-check
+    #    ls -ltr ../
+
+    #- name: Cache Dependency-Check Database
+    #  uses: actions/cache@v4
+    #  with:
+    #    path: ../dependency-check
+    #    key: dependency-check-${{ runner.os }}
+    #    restore-keys: |
+    #      dependency-check-${{ runner.os }}
+
+    #- name: Update NVD cache
+    #  run: |
+    #    ../dependency-check/dependency-check/bin/dependency-check.sh --updateonly --nvdApiKey efe48904-e189-4ac8-9eba-25e237a1359b
+
+    #- name: Scan the repo using OWASP Dependency check
+    #  run: |
+    #    ../dependency-check/dependency-check/bin/dependency-check.sh --project ${{ env.output3 }} --scan . --format HTML --out ${{ env.result }}
+    #    pwd
+    #    ls -ltr
+
+    #- name: Upload owasp dependency check result file
+    #  uses: actions/upload-artifact@v4
+    #  with:
+    #    name: sca-scan-owasp-dc
+    #    path: |
+    #      ${{ env.result }}/dependency-check-report.html
