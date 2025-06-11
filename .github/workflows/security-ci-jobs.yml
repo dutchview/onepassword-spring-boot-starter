@@ -39,16 +39,19 @@ jobs:
         name: sensitive-info-scan
         path: |
           ${{ env.output3 }}-Trufflehog-report.json
-
-
+    
   sast-scan:
     runs-on: ubuntu-latest
     timeout-minutes: 10
-    name: SAST (DevSkim)
+    name: SAST (DevSkim and Semgrep)
     steps:
-
     - name: Checkout the code
       uses: actions/checkout@v4
+
+    - name: Setup python
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.13'
 
     - name: Install dotnet and DevSkim
       run: |
@@ -60,7 +63,7 @@ jobs:
         ls -ltr
         dotnet --version
         dotnet tool install --global Microsoft.CST.DevSkim.CLI
-        rm -rf ./*
+        rm -f dotnet-install.sh
         ls -ltr
 
     - name: Current working directory
@@ -84,13 +87,46 @@ jobs:
         echo "Current directory: ${{ env.result }}"
         devskim analyze -I ${{ env.result }} -f sarif --output-format json > ${{ env.output3 }}-DevSkim-report.json
 
-    - name: Upload json result file if present
+    - name: Upload DevSkim json result file if present
       uses: actions/upload-artifact@v4
       with:
-        name: sast-scan
+        name: sast-scan-devskim
         path: |
           ${{ env.output3 }}-DevSkim-report.json
-      
+
+    - name: Install Semgrep using Python's Pip
+      run: |
+        pwd
+        ls -ltr
+        py_ver=$(python3 --version)
+        echo "Python version: $py_ver"
+        python3 -m pip install semgrep
+        sg_ver=$(semgrep --version)
+        echo "Semgrep version: $sg_ver"
+        ls -ltr
+
+    - name: Scan the code in current directory and output the results in JSON format using Semgrep
+      run: |
+        pwd
+        ls -ltr
+        cd ${{ env.result }}
+        semgrep scan --sarif --json-output=${{ env.output3 }}-semgrep-findings.json
+        cp ${{ env.output3 }}-semgrep-findings.json ../
+        ls -ltr
+        ls -ltr ../ 
+
+    #- name: Upload Semgrep sarif report to github code scanning
+    #  uses: github/codeql-action/upload-sarif@v3
+    #  with:
+    #    sarif_file: ${{ env.output3 }}-semgrep-findings.sarif
+    #
+    - name: Upload Semgrep json result fie if present
+      uses: actions/upload-artifact@v4
+      with:
+        name: sast-scan-semgrep
+        path: |
+          ${{ env.output3 }}-semgrep-findings.json
+
   sbom-scan:
     runs-on: ubuntu-latest
     timeout-minutes: 10
@@ -136,7 +172,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     needs: sbom-scan 
-    name: SCA (Grype and OWASP Dependency Check)
+    name: SCA (Grype)
     steps:
     
     - name: Checkout the code
@@ -179,36 +215,3 @@ jobs:
         path: |
           ${{ env.output3 }}-Grype-sca-report
     
-    #- name: Install OWASP Dependency-Check
-    #  run: |
-    #    VERSION=$(curl -s https://dependency-check.github.io/DependencyCheck/current.txt)
-    #    curl -Ls "https://github.com/dependency-check/DependencyCheck/releases/download/v$VERSION/dependency-check-$VERSION-release.zip" --output ../dependency-check.zip
-    #    ls -ltr ../
-    #    mkdir ../dependency-check
-    #    unzip ../dependency-check.zip -d ../dependency-check
-    #    ls -ltr ../
-
-    #- name: Cache Dependency-Check Database
-    #  uses: actions/cache@v4
-    #  with:
-    #    path: ../dependency-check
-    #    key: dependency-check-${{ runner.os }}
-    #    restore-keys: |
-    #      dependency-check-${{ runner.os }}
-
-    #- name: Update NVD cache
-    #  run: |
-    #    ../dependency-check/dependency-check/bin/dependency-check.sh --updateonly --nvdApiKey efe48904-e189-4ac8-9eba-25e237a1359b
-
-    #- name: Scan the repo using OWASP Dependency check
-    #  run: |
-    #    ../dependency-check/dependency-check/bin/dependency-check.sh --project ${{ env.output3 }} --scan . --format HTML --out ${{ env.result }}
-    #    pwd
-    #    ls -ltr
-
-    #- name: Upload owasp dependency check result file
-    #  uses: actions/upload-artifact@v4
-    #  with:
-    #    name: sca-scan-owasp-dc
-    #    path: |
-    #      ${{ env.result }}/dependency-check-report.html
