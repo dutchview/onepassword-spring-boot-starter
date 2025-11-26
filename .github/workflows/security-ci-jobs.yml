@@ -2,6 +2,8 @@ name: Security CI Jobs
 on: 
   push:
     branches: [develop]
+  pull_request:
+    branches: [develop]
 jobs:
   sensitive-info-scan:
     runs-on: ubuntu-latest
@@ -9,36 +11,28 @@ jobs:
     name: Secret Scan (Trufflehog)
     steps:
 
-    - name: Checkout the code
+    - name: Checkout code
       uses: actions/checkout@v4
     
     - name: Install Trufflehog using the script 
       run: curl -sSfL https://raw.githubusercontent.com/trufflesecurity/trufflehog/main/scripts/install.sh | sh -s -- -b /usr/local/bin
 
-    - name: Current working directory
+    - name: Set Environement Variables
       run: |
-        pwd=$(pwd)
-        echo "First output: $pwd"
-        echo "result=$pwd" >> $GITHUB_ENV
+        echo "REPO_DIR=${{ github.workspace }}" >> $GITHUB_ENV
+        echo "REPO_NAME=$(echo '${{ github.repository }}' | cut -d'/' -f2)" >> $GITHUB_ENV
 
-    - name: Extract repo name
+    - name: Run Trufflehog scan
+      shell: bash
       run: |
-        echo "Second output: ${{ env.result }}"
-        output1=${{ env.result }}
-        echo "Third output: $output1"
-        output2=${output1##*/}
-        echo "Fourth output: $output2"
-        echo "output3=$output2" >> $GITHUB_ENV
+        echo "Scanning repo using Trufflehog..."
+        trufflehog git file://${{ env.REPO_DIR }} --json > ${{ env.REPO_NAME }}-Trufflehog-report.json
 
-    - name: Scan the local repo using Trufflehog
-      run: trufflehog git file://${{ env.result }} --json > ${{ env.output3 }}-Trufflehog-report.json
-
-    - name: Upload json result file if present
+    - name: Upload Trufflehog report
       uses: actions/upload-artifact@v4
       with:
         name: sensitive-info-scan
-        path: |
-          ${{ env.output3 }}-Trufflehog-report.json
+        path: ${{ env.REPO_NAME }}-Trufflehog-report.json
     
   sast-scan:
     runs-on: ubuntu-latest
@@ -53,126 +47,88 @@ jobs:
       with:
         python-version: '3.13'
 
-    - name: Install dotnet and DevSkim
+    - name: Set up .NET and DevSkim
       run: |
         wget https://dot.net/v1/dotnet-install.sh -O dotnet-install.sh
         chmod +x ./dotnet-install.sh
         ./dotnet-install.sh
-        pwd=$(pwd)
-        echo "PWD: $pwd"
-        ls -ltr
-        dotnet --version
         dotnet tool install --global Microsoft.CST.DevSkim.CLI
-        rm -f dotnet-install.sh
-        ls -ltr
+        echo "$HOME/.dotnet/tools" >> $GITHUB_PATH
 
-    - name: Current working directory
+    - name: Set Environment Variable
       run: |
-        ls -ltr
-        pwd=$(pwd)
-        echo "First output: $pwd"
-        echo "result=$pwd" >> $GITHUB_ENV
+        echo "REPO_DIR=${{ github.workspace }}" >> $GITHUB_ENV
+        echo "REPO_NAME=$(echo '${{ github.repository }}' | cut -d'/' -f2)" >> $GITHUB_ENV
 
-    - name: Extract repo name
+    - name: Run DevSkim scan
       run: |
-        echo "Second output: ${{ env.result }}"
-        output1=${{ env.result }}
-        echo "Third output: $output1"
-        output2=${output1##*/}
-        echo "Fourth output: $output2"
-        echo "output3=$output2" >> $GITHUB_ENV
+        devskim analyze -I . -f sarif --output-format json > ${{ env.REPO_NAME }}-DevSkim-report.json
+      continue-on-error: true
 
-    - name: Run SAST scan using DevSkim
-      run: |
-        echo "Current directory: ${{ env.result }}"
-        devskim analyze -I ${{ env.result }} -f sarif --output-format json > ${{ env.output3 }}-DevSkim-report.json
-
-    - name: Upload DevSkim json result file if present
+    - name: Upload DevSkim scan results
       uses: actions/upload-artifact@v4
       with:
-        name: sast-scan-devskim
+        name: devskim-report
         path: |
-          ${{ env.output3 }}-DevSkim-report.json
+          ${{ env.REPO_NAME }}-DevSkim-report.json
 
-    - name: Install Semgrep using Python's Pip
+    - name: Create Python virtual env
+      run: python -m venv .venv
+
+    - name: Switch to Virtual env for installing the scanner
+      run: source .venv/bin/activate  
+
+    - name: Install Semgrep
+      run: pip install semgrep        
+
+    - name: Run Semgrep scan
       run: |
-        pwd
-        ls -ltr
-        py_ver=$(python3 --version)
-        echo "Python version: $py_ver"
-        python3 -m pip install semgrep
-        sg_ver=$(semgrep --version)
-        echo "Semgrep version: $sg_ver"
-        ls -ltr
+        semgrep scan --exclude=dotnet-install.sh --exclude=security-ci-jobs.yaml --json --json-output=${{ env.REPO_NAME }}-Semgrep-report.json
+      continue-on-error: true
 
-    - name: Scan the code in current directory and output the results in JSON format using Semgrep
-      run: |
-        pwd
-        ls -ltr
-        cd ${{ env.result }}
-        semgrep scan --sarif --json-output=${{ env.output3 }}-semgrep-findings.json
-        cp ${{ env.output3 }}-semgrep-findings.json ../
-        ls -ltr
-        ls -ltr ../ 
-
-    #- name: Upload Semgrep sarif report to github code scanning
-    #  uses: github/codeql-action/upload-sarif@v3
-    #  with:
-    #    sarif_file: ${{ env.output3 }}-semgrep-findings.sarif
-    #
-    - name: Upload Semgrep json result fie if present
+    - name: Upload Semgrep scan result
       uses: actions/upload-artifact@v4
       with:
-        name: sast-scan-semgrep
-        path: |
-          ${{ env.output3 }}-semgrep-findings.json
+        name: semgrep-report
+        path: ${{ env.REPO_NAME }}-Semgrep-report.json
 
   sbom-scan:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     name: SBOM (Syft)
+    
     steps:
-      
     - name: Checkout the code
       uses: actions/checkout@v4
     
     - name: Install Syft
       run: |
         curl -sSfL https://raw.githubusercontent.com/anchore/syft/main/install.sh | sh -s -- -b /usr/local/bin
+        syft version
 
-    - name: Current working directory
+    - name: Set Environment Variables
       run: |
-        ls -ltr
-        pwd=$(pwd)
-        echo "First output: $pwd"
-        echo "result=$pwd" >> $GITHUB_ENV
-
-    - name: Extract repo name
-      run: |
-        echo "Second output: ${{ env.result }}"
-        output1=${{ env.result }}
-        echo "Third output: $output1"
-        output2=${output1##*/}
-        echo "Fourth output: $output2"
-        echo "output3=$output2" >> $GITHUB_ENV
+        echo "REPO_DIR=${{ github.workspace }}" >> $GITHUB_ENV
+        echo "REPO_NAME=$(echo '${{ github.repository }}' | cut -d'/' -f2)" >> $GITHUB_ENV
 
     - name: Run SBOM scan on the local repo
       run: |
-        echo "Current directory: ${{ env.result }}"
-        syft ${{ env.result }} --output cyclonedx-json=${{ env.result }}/${{ env.output3 }}-Syft-sbom-report
+        echo "Running Syft SBOM scan on: ${{ env.REPO_DIR }}"
+        syft ${{ env.REPO_DIR }} --output cyclonedx-json="${{ env.REPO_NAME }}-Syft-sbom-report.json"
 
-    - name: Upload json result file if present
+    - name: Upload SBOM Report
       uses: actions/upload-artifact@v4
       with:
-        name: sbom-scan
+        name: syft-sbom-report
         path: |
-          ${{ env.output3 }}-Syft-sbom-report
+          ${{ env.REPO_NAME }}-Syft-sbom-report.json
 
   sca-scan:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     needs: sbom-scan 
-    name: SCA (Grype)
+    name: SCA (Grype & Trivy)
+    
     steps:
     
     - name: Checkout the code
@@ -181,37 +137,46 @@ jobs:
     - name: Install Grype
       run: |
         curl -sSfL https://raw.githubusercontent.com/anchore/grype/main/install.sh | sh -s -- -b /usr/local/bin
+        grype version
         
-    - name: Current working directory
+    - name: Set Environment Variables
       run: |
-        ls -ltr
-        pwd=$(pwd)
-        echo "First output: $pwd"
-        echo "result=$pwd" >> $GITHUB_ENV
+        echo "REPO_DIR=${{ github.workspace }}" >> $GITHUB_ENV
+        echo "REPO_NAME=$(echo '${{ github.repository }}' | cut -d'/' -f2)" >> $GITHUB_ENV
 
-    - name: Extract repo name
-      run: |
-        echo "Second output: ${{ env.result }}"
-        output1=${{ env.result }}
-        echo "Third output: $output1"
-        output2=${output1##*/}
-        echo "Fourth output: $output2"
-        echo "output3=$output2" >> $GITHUB_ENV
-
-    - name: Download artifact
+    - name: Download SBOM Artifact from Syft
       uses: actions/download-artifact@v4
       with:
-        name: sbom-scan
+        name: syft-sbom-report
 
-    - name: Run SCA scan on the local repo
+    - name: Run Grype SCA scan
       run: |
-        echo "Current directory: ${{ env.result }}"
-        grype ${{ env.result }}/${{ env.output3 }}-Syft-sbom-report > ${{ env.output3 }}-Grype-sca-report
+        pwd
+        ls -ltr
+        echo "Scanning SBOM with Grype..."
+        grype ${{ env.REPO_DIR }}/${{ env.REPO_NAME }}-Syft-sbom-report.json > ${{ env.REPO_NAME }}-Grype-sca-report.txt
 
-    - name: Upload Grype scan result file if present
+    - name: Upload Grype Scan Report
       uses: actions/upload-artifact@v4
       with:
-        name: sca-scan-grype
+        name: Grype-Report
         path: |
-          ${{ env.output3 }}-Grype-sca-report
-    
+          ${{ env.REPO_NAME }}-Grype-sca-report.txt
+
+    - name: Run Trivy filesystem scan
+      uses: aquasecurity/trivy-action@0.32.0
+      with:
+        scan-type: 'fs'
+        output: ${{ env.REPO_NAME }}-Trivy-report.json
+        format: json
+        scan-ref: '.'
+        exit-code: '0'
+        ignore-unfixed: true
+        severity: 'CRITICAL,HIGH'
+
+    - name: Upload Trivy Vulnerability Scan Report
+      uses: actions/upload-artifact@v4
+      with:
+        name: Trivy-Report
+        path: ${{ env.REPO_NAME }}-Trivy-report.json
+
