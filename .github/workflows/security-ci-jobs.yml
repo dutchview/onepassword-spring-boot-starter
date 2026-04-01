@@ -224,7 +224,7 @@ jobs:
     - name: Download CycloneDX SBOM Artifact
       uses: actions/download-artifact@v4
       with:
-        name: syft-sbom-cyclone-dx-repor
+        name: syft-sbom-cyclone-dx-report
         path: sbom-artifacts
 
     - name: Generate License Report
