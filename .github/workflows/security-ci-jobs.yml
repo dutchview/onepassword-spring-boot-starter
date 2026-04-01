@@ -114,14 +114,30 @@ jobs:
     - name: Run SBOM scan on the local repo
       run: |
         echo "Running Syft SBOM scan on: ${{ env.REPO_DIR }}"
-        syft ${{ env.REPO_DIR }} --output cyclonedx-json="${{ env.REPO_NAME }}-Syft-sbom-report.json"
+        syft scan ${{ env.REPO_DIR }} -o json > "${{ env.REPO_NAME }}-Syft-json-sbom-report.json"
+        syft scan ${{ env.REPO_DIR }} -o spdx-json > "${{ env.REPO_NAME }}-Syft-spdx-sbom-report.json"
+        syft scan ${{ env.REPO_DIR }} -o cyclonedx-json > "${{ env.REPO_NAME }}-Syft-cyclone-dx-sbom-report.json"
 
-    - name: Upload SBOM Report
+    - name: Upload SBOM JSON Report
       uses: actions/upload-artifact@v4
       with:
-        name: syft-sbom-report
+        name: syft-sbom-json-report
         path: |
-          ${{ env.REPO_NAME }}-Syft-sbom-report.json
+          ${{ env.REPO_NAME }}-Syft-json-sbom-report.json
+
+    - name: Upload SBOM SPDX Report
+      uses: actions/upload-artifact@v4
+      with:
+        name: syft-sbom-spdx-report
+        path: |
+          ${{ env.REPO_NAME }}-Syft-spdx-sbom-report.json
+
+    - name: Upload SBOM Cyclone DX Report
+      uses: actions/upload-artifact@v4
+      with:
+        name: syft-sbom-cyclone-dx-report
+        path: |
+          ${{ env.REPO_NAME }}-Syft-cyclone-dx-sbom-report.json
 
   sca-scan:
     runs-on: ubuntu-latest
@@ -147,24 +163,24 @@ jobs:
     - name: Download SBOM Artifact from Syft
       uses: actions/download-artifact@v4
       with:
-        name: syft-sbom-report
+        name: syft-sbom-json-report
 
     - name: Run Grype SCA scan
       run: |
         pwd
         ls -ltr
         echo "Scanning SBOM with Grype..."
-        grype ${{ env.REPO_DIR }}/${{ env.REPO_NAME }}-Syft-sbom-report.json > ${{ env.REPO_NAME }}-Grype-sca-report.txt
+        cat ${{ env.REPO_DIR }}/${{ env.REPO_NAME }}-Syft-json-sbom-report.json | grype -o json > ${{ env.REPO_NAME }}-Grype-sca-report.json
 
     - name: Upload Grype Scan Report
       uses: actions/upload-artifact@v4
       with:
         name: Grype-Report
         path: |
-          ${{ env.REPO_NAME }}-Grype-sca-report.txt
+          ${{ env.REPO_NAME }}-Grype-sca-report.json
 
     - name: Run Trivy filesystem scan
-      uses: aquasecurity/trivy-action@0.32.0
+      uses: aquasecurity/trivy-action@0.35.0
       with:
         scan-type: 'fs'
         output: ${{ env.REPO_NAME }}-Trivy-report.json
@@ -179,4 +195,49 @@ jobs:
       with:
         name: Trivy-Report
         path: ${{ env.REPO_NAME }}-Trivy-report.json
+
+  license-report:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    needs: sbom-scan
+    name: 3rd-Party License Report
+
+    steps:
+    - name: Checkout the code
+      uses: actions/checkout@v4
+
+    - name: Setup Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.12'
+
+    - name: Set Environment Variables
+      run: |
+        echo "REPO_NAME=$(echo '${{ github.repository }}' | cut -d'/' -f2)" >> $GITHUB_ENV
+
+    - name: Download SPDX SBOM Artifact
+      uses: actions/download-artifact@v4
+      with:
+        name: syft-sbom-spdx-report
+        path: sbom-artifacts
+
+    - name: Download CycloneDX SBOM Artifact
+      uses: actions/download-artifact@v4
+      with:
+        name: syft-sbom-cyclone-dx-repor
+        path: sbom-artifacts
+
+    - name: Generate License Report
+      run: |
+        python .github/scripts/generate-license-report.py \
+          --spdx "sbom-artifacts/${{ env.REPO_NAME }}-Syft-spdx-sbom-report.json" \
+          --cyclonedx "sbom-artifacts/${{ env.REPO_NAME }}-Syft-cyclone-dx-sbom-report.json" \
+          --repo-name "${{ env.REPO_NAME }}" \
+          --output "${{ env.REPO_NAME }}-3rd-party-license-report.html"
+
+    - name: Upload License Report
+      uses: actions/upload-artifact@v4
+      with:
+        name: 3rd-party-license-report
+        path: ${{ env.REPO_NAME }}-3rd-party-license-report.html
 
